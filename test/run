@@ -1,0 +1,22 @@
+#!/usr/bin/env escript
+%%! -hidden
+main([]) ->
+    {ok, _} = net_kernel:start(['vctest_admin@127.0.0.1',longnames]),
+    true = erlang:set_cookie(node(), 'vctest'),
+	code:add_path("./ebin"),
+	error_logger:tty(false),
+	vc_master_test:test(),
+	%
+	volumecap_test:setup(true),
+	%
+	new_meta_test:test(),
+	update_meta_test:test(),
+	delete_meta_test:test(),
+	spawn_interval_test:test(),
+	%
+	remote_handler_rabbitmq_test:test(),
+	%
+	volumecap_consumption_test:test(),
+	volumecap_topup_test:test(),
+	%
+	volumecap_test:teardown().

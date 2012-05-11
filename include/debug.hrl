@@ -1,0 +1,7 @@
+-ifdef(debug).
+-define(DEBUG(Format), io:format(user, "~s.~w: DEBUG: " ++ Format ++ "~n", [ ?MODULE, ?LINE ])).
+-define(DEBUG(Format, Args), io:format(user, "~s.~w: DEBUG: " ++ Format ++ "~n", [?MODULE, ?LINE]++Args)).
+-else.
+-define(DEBUG(Format), true).
+-define(DEBUG(Format, Args), true).
+-endif.

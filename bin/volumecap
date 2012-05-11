@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+usage()
+{
+cat << EOF
+usage: $0 command command_node target_node
+command: start, stop, status, add_node, or del_node
+
+This script starts volume cap server with the given node name
+
+OPTIONS:
+   -detached   Run the server in detached mode, default is with console
+
+Examples:
+  $0 start_node vcnode1@127.0.0.1 (-detached) (-pingto=vcnode1@127.0.0.1,vcnode2@127.0.0.1)
+  $0 start_vc   vcnode1@127.0.0.1
+  $0 status     vcnode1@127.0.0.1
+  $0 stop_node  vcnode1@127.0.0.1
+EOF
+}
+
+BIN_PATH="$( cd "$( dirname "$0" )" && pwd )"
+COMMAND=$1
+NODENAME=$2
+TARGET_NODE=$3
+if [[ $@ =~ \-detached ]]; then
+  DETACHED=true
+fi
+
+if [[ -z $COMMAND  ||  -z $NODENAME ]]; then
+  usage
+  exit 1
+fi
+
+if [ -z $NODENAME ] ; then
+  NODENAME="volumecap@`hostname`"
+  echo "WARNING: node name is not given as parameter, using default $NODENAME"
+  read "Press Enter to continue"
+fi
+
+
+case $COMMAND in
+  start_node)
+
+    PINGTO=""
+    if [[ "$@" =~ -pingto=([a-z@.0-9_,]+)  ]]; then
+      nodes=`echo ${BASH_REMATCH[1]} | tr "," " "`
+      for node in $nodes; do
+        PINGTO="$PINGTO -eval \"net_adm:ping('$node')\""
+      done
+    else
+      echo "ERROR: requires -pingto=<node@host> to make it sure to run primary/secondary"
+      echo "ERROR: If there is notning to ping, but please make it as a habit by giving '-pingto=none'."
+      exit 1
+    fi
+    #echo $PINGTO && exit
+
+    if [ $DETACHED ]; then
+      echo "INFO: starting ${NODENAME} in detached mode, logging to /tmp/${NODENAME}.sasl.log and /tmp/${NODENAME}.kernel.log"
+      command="erl -detached -name ${NODENAME} -mnesia dir '\"/tmp/${NODENAME}\"' -pa $BIN_PATH/../ebin -boot start_sasl -run mnesia -setcookie volumecap \
+         -sasl sasl_error_logger '{file, \"/tmp/${NODENAME}.sasl.log\"}' \
+         -kernel error_logger '{file, \"/tmp/${NODENAME}.kernel.log\"}' \
+         -run vc_master_restarter \
+         $PINGTO"
+      echo $command && eval $command
+    else
+      command="erl -name ${NODENAME} -mnesia dir '\"/tmp/${NODENAME}\"' -pa $BIN_PATH/../ebin -boot start_sasl -run mnesia -setcookie volumecap \
+               -run vc_master_restarter \
+               $PINGTO"
+      echo $command && eval $command 
+    fi
+    ;;
+  start_vc)
+    command="escript $BIN_PATH/volumecap.escript start_vc $NODENAME"
+    echo $command && eval $command
+    ;;
+  stop_node)
+    command="escript $BIN_PATH/volumecap.escript stop_node $NODENAME"
+    echo $command && eval $command
+    ;;
+  status)
+    command="escript $BIN_PATH/volumecap.escript status $NODENAME"
+    echo $command && eval $command
+    ;;
+  ?)
+    usage
+    exit
+    ;;
+esac
